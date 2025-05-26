@@ -1,56 +1,85 @@
+# app.py
 import streamlit as st
 import cv2
 import tempfile
 import time
+import plotly.graph_objects as go
 
-st.title("📽️ 实时视频帧信息显示")
+st.set_page_config(layout="wide")
+st.title("3D Pile Modeling Demo")
 
-# 上传视频文件
-video_file = st.file_uploader("上传一个视频文件", type=["mp4", "mov", "avi", "mkv"])
+col1, col2 = st.columns([1, 1])
 
-if video_file is not None:
-    # 将上传的文件保存为临时文件
-    tfile = tempfile.NamedTemporaryFile(delete=False)
-    tfile.write(video_file.read())
+with col1:
+    st.header("Senser Capture")
 
-    # 打开视频文件
-    cap = cv2.VideoCapture(tfile.name)
+    video_file = st.file_uploader("Upload Video", type=["mp4", "avi", "mov", "mkv"])
+    if video_file:
+        tfile = tempfile.NamedTemporaryFile(delete=False)
+        tfile.write(video_file.read())
+        cap = cv2.VideoCapture(tfile.name)
 
-    if not cap.isOpened():
-        st.error("无法打开视频文件。")
-    else:
-        st.success("视频加载成功，开始播放并解析帧信息...")
-        
-        # 获取视频的 FPS
-        fps = cap.get(cv2.CAP_PROP_FPS)
-        delay = 1.0 / fps if fps > 0 else 0.04
+        if not cap.isOpened():
+            st.error("Cannot open file")
+        else:
+            fps = cap.get(cv2.CAP_PROP_FPS) or 25
+            delay = 1.0 / fps
 
-        # 创建视频帧展示区域和信息展示区域
-        frame_location = st.empty()
-        info_location = st.empty()
+            frame_slot = st.empty()
+            info_slot = st.empty()
 
-        frame_num = 0
+            while cap.isOpened():
+                ret, frame = cap.read()
+                if not ret:
+                    st.warning("Done")
+                    break
 
-        while cap.isOpened():
-            ret, frame = cap.read()
-            if not ret:
-                st.warning("视频播放完毕或读取错误。")
-                break
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                frame_slot.image(frame_rgb, channels="RGB", use_column_width=True)
 
-            # 转换 BGR 为 RGB
-            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                frame_no = int(cap.get(cv2.CAP_PROP_POS_FRAMES))
+                h, w = frame.shape[:2]
+                info_slot.markdown(f"""
+                **FrameNo**: {frame_no}  
+                **Resolution**: {w}×{h}  
+                **FPS**: {fps:.2f}
+                """)
+                time.sleep(delay)
 
-            # 显示帧
-            frame_location.image(frame_rgb, channels="RGB")
+            cap.release()
 
-            # 显示帧信息
-            info_location.markdown(f"""
-            **帧号**: {int(cap.get(cv2.CAP_PROP_POS_FRAMES))}  
-            **尺寸**: {frame.shape[1]}x{frame.shape[0]}  
-            **FPS**: {fps:.2f}
-            """)
+with col2:
+    st.header("Pile Modeling")
 
-            time.sleep(delay)
+    verts = {
+        "x": [1, -1, -1,  1],
+        "y": [1, -1,  1, -1],
+        "z": [1,  1, -1, -1],
+    }
+    faces = {
+        "i": [0, 0, 0, 1],
+        "j": [1, 2, 3, 2],
+        "k": [2, 3, 1, 3],
+    }
 
-        cap.release()
-        st.success("播放结束。")
+    mesh = go.Mesh3d(
+        x=verts["x"], y=verts["y"], z=verts["z"],
+        i=faces["i"], j=faces["j"], k=faces["k"],
+        opacity=0.5,
+        flatshading=True,
+        lighting=dict(ambient=0.5, diffuse=0.8, roughness=0.5, fresnel=0.2),
+        lightposition=dict(x=100, y=200, z=0)
+    )
+
+    fig = go.Figure(data=[mesh])
+    fig.update_layout(
+        scene=dict(
+            xaxis=dict(visible=False),
+            yaxis=dict(visible=False),
+            zaxis=dict(visible=False),
+            aspectmode="data"
+        ),
+        margin=dict(l=0, r=0, t=0, b=0)
+    )
+
+    st.plotly_chart(fig, use_container_width=True)

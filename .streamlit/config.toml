@@ -1,0 +1,8 @@
+# ~/.streamlit/config.toml
+[theme]
+base = "light"
+primaryColor = "#A3B18A"        # 莫兰迪绿色
+backgroundColor = "#F5F5F0"     # 柔和灰白
+secondaryBackgroundColor = "#E6E3DC"  # 淡沙色背景
+textColor = "#4A4A4A"           # 柔和深灰
+font = "sans serif"
